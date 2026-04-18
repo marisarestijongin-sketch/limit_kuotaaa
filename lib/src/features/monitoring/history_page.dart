@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:limit_kuota/src/core/data/database_helper.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -18,12 +19,10 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _refreshHistory() {
-    setState(() {
-      _historyList = DatabaseHelper.instance.getHistory();
-    });
+    _historyList = DatabaseHelper.instance.getHistory();
   }
 
-  // Helper untuk format bytes (sama seperti di Network page)
+  // 🔧 format bytes
   String _formatBytes(int bytes) {
     if (bytes <= 0) return "0.00 MB";
     double mb = bytes / (1024 * 1024);
@@ -33,41 +32,86 @@ class _HistoryPageState extends State<HistoryPage> {
     return "${mb.toStringAsFixed(2)} MB";
   }
 
+  // 📅 format tanggal biar cantik
+  String _formatDate(String date) {
+    DateTime parsed = DateTime.parse(date);
+    return DateFormat('dd MMM yyyy').format(parsed);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Riwayat Penggunaan")),
+      backgroundColor: Colors.pink[50],
+      appBar: AppBar(
+        title: const Text("Riwayat Penggunaan"),
+        backgroundColor: Colors.pink,
+      ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _historyList,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("Belum ada riwayat data."));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("Belum ada riwayat data 😢"));
           }
 
           final data = snapshot.data!;
+
           return ListView.builder(
             itemCount: data.length,
             itemBuilder: (context, index) {
               final item = data[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  leading: const Icon(Icons.history, color: Colors.blue),
-                  title: Text(
-                    item['date'], // Tanggal (YYYY-MM-DD)
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("WiFi: ${_formatBytes(item['wifi'])}"),
-                      Text("Mobile: ${_formatBytes(item['mobile'])}"),
-                    ],
-                  ),
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 5,
+                    )
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 📅 Tanggal
+                    Text(
+                      _formatDate(item['date']),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // 📶 WiFi
+                    Row(
+                      children: [
+                        const Icon(Icons.wifi, color: Colors.purple),
+                        const SizedBox(width: 10),
+                        Text("WiFi: ${_formatBytes(item['wifi'])}"),
+                      ],
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    // 📱 Data
+                    Row(
+                      children: [
+                        const Icon(Icons.signal_cellular_alt,
+                            color: Colors.pink),
+                        const SizedBox(width: 10),
+                        Text("Data: ${_formatBytes(item['mobile'])}"),
+                      ],
+                    ),
+                  ],
                 ),
               );
             },

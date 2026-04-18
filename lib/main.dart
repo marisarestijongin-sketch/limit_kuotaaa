@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:limit_kuota/src/features/monitoring/network_page.dart';
+import 'package:provider/provider.dart';
+
+import 'theme/theme_notifier.dart';
+import 'pages/login_page.dart';
 
 void main() {
-  // Jalankan MyApp, bukan langsung Network
-  runApp(const MyApp()); 
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeNotifier(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -11,9 +18,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false, // Opsional: hilangkan banner debug
-      home: Network(), // Network sekarang punya akses ke Directionality dari MaterialApp
+    final themeNotifier = Provider.of<ThemeNotifier>(context);
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      themeMode: themeNotifier.isDark ? ThemeMode.dark : ThemeMode.light,
+
+      theme: ThemeData(
+        brightness: Brightness.light,
+        primarySwatch: Colors.pink,
+      ),
+
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.pink,
+      ),
+
+      home: const LoginPage(),
     );
   }
 }

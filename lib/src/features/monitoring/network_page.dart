@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart'; // Import intl untuk format tanggal
-import 'package:limit_kuota/src/core/data/database_helper.dart'; // Import Database Helper
+import 'package:intl/intl.dart';
+import 'package:limit_kuota/src/core/data/database_helper.dart';
 import 'package:limit_kuota/src/core/services/intent_helper.dart';
-import 'package:limit_kuota/src/features/monitoring/history_page.dart'; // Import History Page
+import 'package:limit_kuota/src/features/monitoring/history_page.dart';
 
-class Network extends StatefulWidget {
-  const Network({super.key});
+class NetworkPage extends StatefulWidget {
+  const NetworkPage({super.key});
 
   @override
-  State<Network> createState() => _NetworkState();
+  State<NetworkPage> createState() => _NetworkState();
 }
 
-class _NetworkState extends State<Network> {
+class _NetworkState extends State<NetworkPage> {
   static const platform = MethodChannel('limit_kuota/channel');
 
   String wifiUsage = "0.00 MB";
@@ -20,31 +20,28 @@ class _NetworkState extends State<Network> {
 
   Future<void> fetchUsage() async {
     try {
-      // Sekarang result adalah Map
-      final Map<dynamic, dynamic> result = await platform.invokeMethod(
-        'getTodayUsage',
-      );
+      final Map<dynamic, dynamic> result =
+          await platform.invokeMethod('getTodayUsage');
 
-      // --- LOGIKA PENYIMPANAN KE SQLITE ---
-      // Ambil tanggal hari ini dalam format YYYY-MM-DD
       String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Ambil nilai integer (raw bytes) dari result
       int wifiBytes = result['wifi'] ?? 0;
       int mobileBytes = result['mobile'] ?? 0;
 
-      // Simpan ke database (akan update jika tanggal hari ini sudah ada)
       await DatabaseHelper.instance.insertOrUpdate(
         todayDate,
         wifiBytes,
         mobileBytes,
       );
-      // ------------------------------------
 
       setState(() {
-        wifiUsage = _formatBytes(result['wifi']);
-        mobileUsage = _formatBytes(result['mobile']);
+        wifiUsage = _formatBytes(wifiBytes);
+        mobileUsage = _formatBytes(mobileBytes);
       });
+
+      // 🔥 cek limit
+      await checkLimitAndWarn(mobileBytes);
+
     } on PlatformException catch (e) {
       if (e.code == "PERMISSION_DENIED") {
         _showPermissionDialog();
@@ -54,16 +51,18 @@ class _NetworkState extends State<Network> {
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return "0.00 MB";
+
     double mb = bytes / (1024 * 1024);
+
     if (mb > 1024) {
       return "${(mb / 1024).toStringAsFixed(2)} GB";
     }
+
     return "${mb.toStringAsFixed(2)} MB";
   }
 
   Future<void> checkLimitAndWarn(int currentUsage) async {
-    // 1024 MB dalam Bytes
-    int limitInBytes = 1024 * 1024 * 1024;
+    int limitInBytes = 1024 * 1024 * 1024; // 1GB
 
     if (currentUsage >= limitInBytes) {
       showDialog(
@@ -71,9 +70,8 @@ class _NetworkState extends State<Network> {
         builder: (context) => AlertDialog(
           title: const Text("Batas Kuota Tercapai!"),
           content: const Text(
-            "Penggunaan data Anda sudah mencapai mencapai limit. "
-            "Sistem Android tidak mengizinkan aplikasi mematikan internet secara otomatis. "
-            "Silakan aktifkan 'Set Data Limit' di pengaturan sistem agar koneksi terputus otomatis.",
+            "Penggunaan data sudah mencapai limit. "
+            "Silakan aktifkan 'Set Data Limit' di pengaturan sistem.",
           ),
           actions: [
             TextButton(
@@ -102,30 +100,52 @@ class _NetworkState extends State<Network> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.pink[50],
       appBar: AppBar(
         title: const Text('Monitoring Data'),
+        backgroundColor: Colors.pink,
         actions: [
-          // Tombol untuk menuju halaman History
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const HistoryPage()),
+                MaterialPageRoute(
+                  builder: (context) => const HistoryPage(),
+                ),
               );
             },
           ),
         ],
       ),
-      body: Center(
+
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _usageCard("WiFi Today", wifiUsage, Icons.wifi),
+            const Text(
+              "Pemakaian Hari Ini",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
             const SizedBox(height: 20),
-            _usageCard("Mobile Today", mobileUsage, Icons.signal_cellular_alt),
-            const SizedBox(height: 40),
+
+            _usageCard("WiFi", wifiUsage, Icons.wifi, Colors.purple),
+            const SizedBox(height: 15),
+            _usageCard("Data Seluler", mobileUsage,
+                Icons.signal_cellular_alt, Colors.pink),
+
+            const SizedBox(height: 30),
+
             ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pink,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 12),
+              ),
               onPressed: fetchUsage,
               icon: const Icon(Icons.refresh),
               label: const Text('Refresh Data'),
@@ -136,26 +156,31 @@ class _NetworkState extends State<Network> {
     );
   }
 
-  Widget _usageCard(String title, String value, IconData icon) {
+  Widget _usageCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
-      width: 300,
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: color),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 40, color: Colors.blue),
+          Icon(icon, size: 40, color: color),
           const SizedBox(width: 20),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
               Text(
                 value,
-                style: const TextStyle(fontSize: 20, color: Colors.blueAccent),
+                style: TextStyle(
+                  fontSize: 20,
+                  color: color,
+                ),
               ),
             ],
           ),
@@ -167,13 +192,13 @@ class _NetworkState extends State<Network> {
   void _showPermissionDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false, // User harus menekan tombol
-      builder: (BuildContext context) {
+      barrierDismissible: false,
+      builder: (context) {
         return AlertDialog(
           title: const Text("Izin Diperlukan"),
           content: const Text(
-            "Aplikasi membutuhkan izin 'Akses Penggunaan' untuk membaca statistik data internet di perangkat Anda.\n\n"
-            "Silakan aktifkan izin untuk aplikasi ini di halaman pengaturan yang akan terbuka.",
+            "Aplikasi membutuhkan izin akses penggunaan.\n\n"
+            "Silakan aktifkan di pengaturan.",
           ),
           actions: [
             TextButton(
@@ -183,8 +208,6 @@ class _NetworkState extends State<Network> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Memanggil kembali fetchUsage akan memicu Kotlin
-                // untuk membuka halaman pengaturan lagi
                 fetchUsage();
               },
               child: const Text("Buka Pengaturan"),
