@@ -13,7 +13,7 @@ class _LoginState extends State<LoginPage> {
   final TextEditingController password = TextEditingController();
 
   void login() {
-    if (username.text == "berliyana" && password.text == "12345") {
+    if (username.text == "kelompok2" && password.text == "12345") {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const Dashboard()),
